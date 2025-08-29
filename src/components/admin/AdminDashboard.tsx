@@ -5,6 +5,7 @@ import { CustomerManagement } from './CustomerManagement';
 import { FinancialOverview } from './FinancialOverview';
 import { InactiveCustomers } from './InactiveCustomers';
 import { AdminSettings } from './AdminSettings';
+import { AdminStaff } from './AdminStaff';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 
@@ -13,7 +14,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
-  const [activeView, setActiveView] = useState<'calendar' | 'customers' | 'finances' | 'inactive' | 'settings'>('calendar');
+  const [activeView, setActiveView] = useState<'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff'>('calendar');
 
   return (
     <div className="flex h-screen bg-background">
@@ -25,6 +26,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           <h1 className="text-2xl font-bold">
             {activeView === 'calendar' && 'Terminkalender'}
             {activeView === 'customers' && 'Kundenverwaltung'}
+            {activeView === 'staff' && 'Mitarbeiter'}
             {activeView === 'finances' && 'Finanzübersicht'}
             {activeView === 'inactive' && 'Inaktive Kunden'}
             {activeView === 'settings' && 'Einstellungen'}
@@ -39,6 +41,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         <main className="flex-1 p-6 overflow-auto">
           {activeView === 'calendar' && <CalendarView />}
           {activeView === 'customers' && <CustomerManagement />}
+          {activeView === 'staff' && <AdminStaff />}
           {activeView === 'finances' && <FinancialOverview />}
           {activeView === 'inactive' && <InactiveCustomers />}
           {activeView === 'settings' && <AdminSettings />}
