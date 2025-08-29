@@ -1,11 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Users, TrendingUp, Scissors, Settings, UserX } from 'lucide-react';
+import { Calendar, Users, TrendingUp, Scissors, Settings, UserX, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AdminSidebarProps {
-  activeView: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings';
-  onViewChange: (view: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings') => void;
+  activeView: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff';
+  onViewChange: (view: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff') => void;
 }
 
 export function AdminSidebar({ activeView, onViewChange }: AdminSidebarProps) {
@@ -21,6 +21,12 @@ export function AdminSidebar({ activeView, onViewChange }: AdminSidebarProps) {
       label: 'Kundenverwaltung',
       icon: Users,
       description: 'Kundenstamm'
+    },
+    {
+      id: 'staff' as const,
+      label: 'Mitarbeiter',
+      icon: UserCheck,
+      description: 'Personal & Arbeitszeiten'
     },
     {
       id: 'finances' as const,
