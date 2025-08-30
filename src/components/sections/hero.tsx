@@ -46,6 +46,10 @@ const Hero = () => {
         <div className="space-y-16 animate-in fade-in slide-in-from-bottom-10 duration-1000">
           <div className="space-y-8">
             <div className="flex flex-col items-center">
+              {/* Greeting */}
+              <p className="text-2xl md:text-3xl font-light text-white/80 tracking-wide mb-4 animate-in fade-in slide-in-from-top-5 duration-1000">
+                Hallo
+              </p>
               <div className="relative group">
                 <h1 className="text-7xl md:text-9xl font-heading font-bold leading-tight text-white drop-shadow-2xl group-hover:scale-105 transition-transform duration-1000">
                   <span className="bg-gradient-to-r from-white via-white/95 to-white bg-clip-text text-transparent">
