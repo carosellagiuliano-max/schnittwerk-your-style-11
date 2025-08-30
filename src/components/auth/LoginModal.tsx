@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mail, Lock, Eye, EyeOff, ArrowLeft, Users, Shield } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface LoginModalProps {
   children: React.ReactNode;
@@ -44,12 +45,12 @@ const LoginModal = ({ children }: LoginModalProps) => {
     e.preventDefault();
     
     if (selectedPortal === 'admin') {
-      console.log('Admin portal login');
+      logger.info('Admin portal login');
       navigate('/admin');
     } else if (selectedPortal === 'customer') {
       // Test credentials for demo purposes
       if (email === 'giuli.oneri@hotmail.com' && password === 'giuli123') {
-        console.log('Customer portal login successful');
+        logger.info('Customer portal login successful');
         navigate('/kunden-dashboard');
       } else {
         alert('Ungültige Anmeldedaten. Verwenden Sie: giuli.oneri@hotmail.com / giuli123');

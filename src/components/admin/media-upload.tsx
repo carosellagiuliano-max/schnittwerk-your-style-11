@@ -49,18 +49,25 @@ export function MediaUpload({
     const response = await fetch('/api/media/upload', {
       method: 'POST',
       headers: {
-        'x-tenant-id': 't_dev',
-        'x-user-email': 'admin@schnittwerk.ch'
+        'x-user-role': 'admin',
+        'x-user-email': 'admin@dev.local'
       },
       body: formData
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+      }
       throw new Error(errorData.error || 'Upload failed');
     }
 
-    return response.json();
+    const result = await response.json();
+    return result.data || result;
   }, [category, entityId]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {

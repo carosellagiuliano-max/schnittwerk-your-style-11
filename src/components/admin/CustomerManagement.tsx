@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { logger } from '@/lib/logger';
 import { 
   Table,
   TableBody,
@@ -511,7 +512,7 @@ export function CustomerManagement() {
         <AddCustomerModal
           onClose={() => setShowAddCustomer(false)}
           onSave={(customerData) => {
-            console.log('New customer:', customerData);
+            logger.info('New customer:', customerData);
             // Here you would normally save to database
           }}
         />

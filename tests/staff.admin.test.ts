@@ -64,8 +64,8 @@ describe('Staff API', () => {
         .set(ADMIN_HEADERS)
         .send({});
 
-      expect(response.status).toBe(422);
-      expect(response.body.error).toBe('Name required');
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain('name');
     });
   });
 

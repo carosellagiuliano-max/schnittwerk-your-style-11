@@ -6,6 +6,8 @@ describe('PING', () => {
   it('returns ok:true', async () => {
     const r = await request(app).get('/api/ping')
     expect(r.status).toBe(200)
-    expect(r.body).toEqual({ ok: true })
+    expect(r.body).toHaveProperty('ok', true)
+    expect(r.body).toHaveProperty('timestamp')
+    expect(r.body).toHaveProperty('version')
   })
 })

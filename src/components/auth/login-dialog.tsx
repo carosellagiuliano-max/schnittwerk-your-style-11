@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { logger } from '@/lib/logger';
 
 interface LoginDialogProps {
   children: React.ReactNode;
@@ -23,7 +24,7 @@ const LoginDialog = ({ children }: LoginDialogProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Hier würde die Login-Logik implementiert werden
-    console.log('Login attempt:', { email, password });
+    logger.info('Login attempt:', { email, password });
   };
 
   return (

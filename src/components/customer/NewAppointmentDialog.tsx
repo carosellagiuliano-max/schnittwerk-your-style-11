@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Textarea } from '@/components/ui/textarea';
 import { CalendarIcon, Clock, Scissors, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
 import { de } from 'date-fns/locale';
 
 const NewAppointmentDialog = () => {
@@ -45,7 +46,7 @@ const NewAppointmentDialog = () => {
   ];
 
   const handleBookAppointment = () => {
-    console.log('Booking appointment:', {
+    logger.info('Booking appointment:', {
       date: selectedDate,
       time: selectedTime,
       service: selectedService,

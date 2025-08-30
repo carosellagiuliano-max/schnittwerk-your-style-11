@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Clock, User, Scissors, Search, Filter, Plus, ChevronLeft, ChevronRight, Phone, Mail, CalendarDays, Grid3X3, Layout, Maximize2 } from 'lucide-react';
 import { AppointmentBookingDialog } from '@/components/booking/appointment-booking-dialog';
 import { AddCustomerModal } from './AddCustomerModal';
+import { logger } from '@/lib/logger';
 
 const mockEmployees = [
   { id: 'all', name: 'Alle Mitarbeiter', color: 'bg-gray-100' },
@@ -710,7 +711,7 @@ export function CalendarView() {
         <AddCustomerModal 
           onClose={() => setShowNewCustomerModal(false)}
           onSave={(customer) => {
-            console.log('New customer:', customer);
+            logger.info('New customer:', customer);
             setShowNewCustomerModal(false);
             // After creating customer, open booking dialog
             setShowBookingDialog(true);

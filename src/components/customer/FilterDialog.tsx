@@ -14,6 +14,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, Filter } from 'lucide-react';
 import { format } from 'date-fns';
+import { logger } from '@/lib/logger';
 
 interface FilterDialogProps {
   type: 'appointments' | 'products' | 'history';
@@ -40,7 +41,7 @@ const FilterDialog = ({ type }: FilterDialogProps) => {
   };
 
   const handleApplyFilters = () => {
-    console.log('Applying filters:', {
+    logger.info('Applying filters:', {
       type,
       dateFrom,
       dateTo,

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, Clock, Calendar, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { logger } from '@/lib/logger';
 
 const ADMIN_HEADERS = {
   'x-user-role': 'admin',
@@ -87,7 +88,7 @@ export function AdminStaff() {
         setStaff(data);
       }
     } catch (error) {
-      console.error('Failed to load staff:', error);
+      logger.error('Failed to load staff:', error as error as Error);
     } finally {
       setLoading(false);
     }
@@ -101,7 +102,7 @@ export function AdminStaff() {
         setSchedules(data);
       }
     } catch (error) {
-      console.error('Failed to load schedules:', error);
+      logger.error('Failed to load schedules:', error as error as Error);
     }
   };
 
@@ -113,7 +114,7 @@ export function AdminStaff() {
         setTimeOffs(data);
       }
     } catch (error) {
-      console.error('Failed to load timeoffs:', error);
+      logger.error('Failed to load timeoffs:', error as Error);
     }
   };
 
@@ -134,7 +135,7 @@ export function AdminStaff() {
         setIsCreateDialogOpen(false);
       }
     } catch (error) {
-      console.error('Failed to create staff:', error);
+      logger.error('Failed to create staff:', error as Error);
     }
   };
 
@@ -152,7 +153,7 @@ export function AdminStaff() {
         ));
       }
     } catch (error) {
-      console.error('Failed to update staff:', error);
+      logger.error('Failed to update staff:', error as Error);
     }
   };
 
@@ -170,7 +171,7 @@ export function AdminStaff() {
         }
       }
     } catch (error) {
-      console.error('Failed to delete staff:', error);
+      logger.error('Failed to delete staff:', error as Error);
     }
   };
 
@@ -201,7 +202,7 @@ export function AdminStaff() {
         alert(error.error || 'Fehler beim Hinzufügen der Arbeitszeit');
       }
     } catch (error) {
-      console.error('Failed to add schedule:', error);
+      logger.error('Failed to add schedule:', error as Error);
     }
   };
 
@@ -218,7 +219,7 @@ export function AdminStaff() {
         setSchedules(prev => prev.filter(s => s.id !== scheduleId));
       }
     } catch (error) {
-      console.error('Failed to delete schedule:', error);
+      logger.error('Failed to delete schedule:', error as Error);
     }
   };
 
@@ -243,7 +244,7 @@ export function AdminStaff() {
         setTimeOffForm({ dateFrom: '', dateTo: '', reason: '' });
       }
     } catch (error) {
-      console.error('Failed to add timeoff:', error);
+      logger.error('Failed to add timeoff:', error as Error);
     }
   };
 
@@ -260,7 +261,7 @@ export function AdminStaff() {
         setTimeOffs(prev => prev.filter(t => t.id !== timeOffId));
       }
     } catch (error) {
-      console.error('Failed to delete timeoff:', error);
+      logger.error('Failed to delete timeoff:', error as Error);
     }
   };
 

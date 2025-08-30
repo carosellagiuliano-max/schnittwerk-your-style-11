@@ -1,143 +1,298 @@
-import { Router } from 'express'
-import { db } from '../lib/db'
-import { tenantId, requireRole } from '../lib/guards'
-const r = Router()
+import { Router } from 'express';
+import { z } from 'zod';
+import { db } from '../lib/db.js';
+import { tenantId, requireRole } from '../lib/guards.js';
+import { logger } from '../lib/logger.js';
+import { asyncHandler } from '../lib/middleware.js';
+import { createTenantDb } from '../lib/db-helpers.js';
+import { 
+  bookingSchema, 
+  validateBody, 
+  validateQuery, 
+  paginationSchema,
+  emailSchema 
+} from '../lib/validation.js';
+import { 
+  ValidationError, 
+  ConflictError, 
+  ForbiddenError, 
+  UnauthorizedError 
+} from '../lib/errors.js';
 
-// Public: eigene Buchung anlegen (Kunde)
-r.post('/api/bookings', async (req,res)=>{
-  const { serviceId, staffId, start, customerEmail } = req.body || {}
-  if (!serviceId || !staffId || !start || !customerEmail) return res.status(422).json({ error:'Missing fields' })
-  const t = tenantId(req)
-  // Ban?
-  const ban = await db.customerBan.findFirst({ where:{ tenantId:t, email:customerEmail } })
-  if (ban) return res.status(403).json({ error:'Banned' })
-  const svc = await db.service.findUnique({ where:{ id: serviceId } })
-  if (!svc || svc.tenantId !== t || !svc.active) return res.status(404).json({ error:'Service not found' })
-  const startDate = new Date(start)
-  const endDate = new Date(startDate.getTime() + svc.durationMin*60000)
-  // Overlap? Korrekte Logik: (startA < endB) && (endA > startB)
-  const overlap = await db.booking.findFirst({
-    where:{ 
-      tenantId:t, 
-      staffId, 
-      status:'CONFIRMED', 
-      AND: [
-        { startAt: { lt: endDate } },
-        { endAt: { gt: startDate } }
-      ]
+const router = Router();
+
+interface BookingWhere {
+  tenantId: string;
+  startAt?: {
+    gte?: Date;
+    lte?: Date;
+  };
+  staffId?: string;
+  status?: string;
+}
+
+/**
+ * Public: Create booking (Customer)
+ */
+router.post('/api/bookings', asyncHandler(async (req, res) => {
+  const { serviceId, staffId, customerEmail, start } = validateBody(bookingSchema, req.body);
+  const t = tenantId(req);
+  const tenantDb = createTenantDb(t);
+
+  // Check if customer is banned
+  const isBanned = await tenantDb.isCustomerBanned(customerEmail);
+  if (isBanned) {
+    throw new ForbiddenError('Customer is banned');
+  }
+
+  // Validate service exists and is active
+  const service = await tenantDb.findActiveService(serviceId);
+  
+  // Validate staff exists and is active
+  const staff = await tenantDb.findActiveStaff(staffId);
+
+  const startDate = new Date(start);
+  const endDate = new Date(startDate.getTime() + service.durationMin * 60000);
+
+  // Check for booking conflicts
+  const hasConflict = await tenantDb.hasBookingConflict(staffId, startDate, endDate);
+  if (hasConflict) {
+    throw new ConflictError('Time slot is already booked');
+  }
+
+  // Check if staff is available (not on time off)
+  const isAvailable = await tenantDb.isStaffAvailable(staffId, startDate);
+  if (!isAvailable) {
+    throw new ConflictError('Staff is not available on this date');
+  }
+
+  const booking = await db.booking.create({
+    data: {
+      tenantId: t,
+      serviceId,
+      staffId,
+      customerEmail,
+      startAt: startDate,
+      endAt: endDate,
+      status: 'CONFIRMED',
+      createdBy: customerEmail
     }
-  })
-  if (overlap) return res.status(409).json({ error:'Overlap' })
-  const created = await db.booking.create({
-    data:{ tenantId:t, serviceId, staffId, startAt:startDate, endAt:endDate, customerEmail, status:'CONFIRMED', createdBy: customerEmail }
-  })
-  res.status(201).json(created)
-})
+  });
 
-// Public: eigene Buchungen (nur zukünftige)
-r.get('/api/bookings/me', async (req,res)=>{
-  if (!req.user || req.user.role !== 'customer') return res.status(401).json({ error:'Not logged in' })
-  const list = await db.booking.findMany({
-    where:{ 
-      tenantId: tenantId(req), 
-      customerEmail: req.user.email, 
-      status:'CONFIRMED',
-      startAt: { gte: new Date() } // nur zukünftige Termine
+  logger.info('Booking created', {
+    bookingId: booking.id,
+    customerEmail,
+    serviceId,
+    staffId,
+    startAt: startDate.toISOString()
+  });
+
+  res.status(201).json(booking);
+}));
+
+/**
+ * Public: Get customer's own bookings
+ */
+router.get('/api/bookings/me', asyncHandler(async (req, res) => {
+  if (!req.user || req.user.role !== 'customer') {
+    throw new UnauthorizedError('Customer login required');
+  }
+
+  const bookings = await db.booking.findMany({
+    where: {
+      tenantId: tenantId(req),
+      customerEmail: req.user.email,
+      status: 'CONFIRMED',
+      startAt: { gte: new Date() } // Only future bookings
     },
-    orderBy:{ startAt:'asc' }
-  })
-  res.json(list)
-})
+    include: {
+      service: { select: { name: true, durationMin: true } },
+      staff: { select: { name: true } }
+    },
+    orderBy: { startAt: 'asc' }
+  });
 
-// Public: Storno (nur >24h)
-r.delete('/api/bookings/:id', async (req,res)=>{
-  const { id } = req.params
-  const t = tenantId(req)
-  const b = await db.booking.findUnique({ where:{ id } })
-  if (!b || b.tenantId !== t) return res.status(404).json({ error:'Not found' })
-  const asCustomer = !!req.user && req.user.role === 'customer'
-  if (asCustomer) {
-    if (req.user!.email !== b.customerEmail) return res.status(403).json({ error:'Forbidden' })
-    const diffH = (b.startAt.getTime() - Date.now()) / 36e5
-    if (diffH < 24) return res.status(400).json({ error:'Too late to cancel (<24h)' })
-  }
-  await db.booking.update({ where:{ id }, data:{ status:'CANCELLED', cancelledBy: req.user?.email ?? 'system' } })
-  // TODO: Warteliste prüfen, ggf. Mail
-  res.status(204).send()
-})
+  res.json(bookings);
+}));
 
-// Admin: Listen/erstellen/löschen
-r.get('/api/admin/bookings', requireRole(['owner','admin']), async (req,res)=>{
-  const { from, to, staffId, status } = req.query
-  const t = tenantId(req)
-  const where:any = { tenantId:t }
-  if (from || to) {
-    where.startAt = {}
-    if (from) where.startAt.gte = new Date(String(from))
-    if (to)   where.startAt.lte = new Date(String(to))
-  }
-  if (staffId) where.staffId = String(staffId)
-  if (status)  where.status = String(status)
-  const list = await db.booking.findMany({ where, orderBy:{ startAt:'asc' } })
-  res.json(list)
-})
+/**
+ * Public: Cancel booking (24h rule applies for customers)
+ */
+router.delete('/api/bookings/:id', asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const t = tenantId(req);
+  const tenantDb = createTenantDb(t);
 
-r.post('/api/admin/bookings', requireRole(['owner','admin']), async (req,res)=>{
-  const { serviceId, staffId, start, customerEmail } = req.body || {}
-  if (!serviceId || !staffId || !start || !customerEmail) return res.status(422).json({ error:'Missing fields' })
-  const t = tenantId(req)
-  const svc = await db.service.findUnique({ where:{ id: serviceId } })
-  if (!svc || svc.tenantId !== t) return res.status(404).json({ error:'Service not found' })
-  const startDate = new Date(start)
-  const endDate = new Date(startDate.getTime() + svc.durationMin*60000)
-  // Overlap? Korrekte Logik: (startA < endB) && (endA > startB)
-  const overlap = await db.booking.findFirst({
-    where:{ 
-      tenantId:t, 
-      staffId, 
-      status:'CONFIRMED', 
-      AND: [
-        { startAt: { lt: endDate } },
-        { endAt: { gt: startDate } }
-      ]
+  const booking = await tenantDb.findBooking(id);
+
+  const isCustomer = req.user?.role === 'customer';
+  
+  if (isCustomer) {
+    if (req.user!.email !== booking.customerEmail) {
+      throw new ForbiddenError('Not your booking');
     }
-  })
-  if (overlap) return res.status(409).json({ error:'Overlap' })
-  const created = await db.booking.create({
-    data:{ tenantId:t, serviceId, staffId, startAt:startDate, endAt:endDate, customerEmail, status:'CONFIRMED', createdBy: req.user?.email ?? null }
-  })
-  res.status(201).json(created)
-})
 
-r.delete('/api/admin/bookings/:id', requireRole(['owner','admin']), async (req,res)=>{
-  const { id } = req.params
-  const t = tenantId(req)
-  const b = await db.booking.findUnique({ where:{ id } })
-  if (!b || b.tenantId !== t) return res.status(404).json({ error:'Not found' })
-  await db.booking.update({ where:{ id }, data:{ status:'CANCELLED', cancelledBy: req.user?.email ?? 'admin' } })
-  // TODO: Warteliste benachrichtigen
-  res.status(204).send()
-})
+    if (booking.status !== 'CONFIRMED') {
+      throw new ValidationError('Booking is already cancelled');
+    }
 
-// Customer: cancel own booking (>24h only)
-r.delete('/api/bookings/:id', async (req,res)=>{
-  const { id } = req.params
-  if (!req.user || req.user.role !== 'customer') return res.status(401).json({ error:'Not logged in' })
-  const t = tenantId(req)
-  const b = await db.booking.findUnique({ where:{ id } })
-  if (!b || b.tenantId !== t) return res.status(404).json({ error:'Not found' })
-  if (b.customerEmail !== req.user.email) return res.status(403).json({ error:'Not your booking' })
-  if (b.status !== 'CONFIRMED') return res.status(400).json({ error:'Already cancelled' })
-  
-  // 24h rule
-  const now = new Date()
-  const hoursUntilStart = (b.startAt.getTime() - now.getTime()) / (1000 * 60 * 60)
-  if (hoursUntilStart < 24 && req.user.role === 'customer') {
-    return res.status(400).json({ error:'Too late to cancel (less than 24h)' })
+    // 24h cancellation rule for customers
+    const hoursUntilStart = (booking.startAt.getTime() - Date.now()) / (1000 * 60 * 60);
+    if (hoursUntilStart < 24) {
+      throw new ValidationError('Cannot cancel booking less than 24 hours before start time');
+    }
   }
-  
-  await db.booking.update({ where:{ id }, data:{ status:'CANCELLED', cancelledBy: req.user.email } })
-  res.status(204).send()
-})
 
-export default r
+  await db.booking.update({
+    where: { id },
+    data: {
+      status: 'CANCELLED',
+      cancelledBy: req.user?.email ?? 'system'
+    }
+  });
+
+  logger.info('Booking cancelled', {
+    bookingId: id,
+    cancelledBy: req.user?.email ?? 'system',
+    customerEmail: booking.customerEmail
+  });
+
+  // TODO: Notify waiting list customers
+
+  res.status(204).send();
+}));
+
+/**
+ * Admin: List bookings with filters
+ */
+router.get('/api/admin/bookings', requireRole(['owner', 'admin']), asyncHandler(async (req, res) => {
+  const querySchema = z.object({
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    staffId: z.string().optional(),
+    status: z.enum(['CONFIRMED', 'CANCELLED']).optional(),
+    page: z.string().optional().transform(val => parseInt(val || '1') || 1),
+    limit: z.string().optional().transform(val => Math.min(parseInt(val || '20') || 20, 100))
+  });
+
+  const queryData = querySchema.parse(req.query);
+  const { from, to, staffId, status, page, limit } = queryData;
+
+  const t = tenantId(req);
+  const where: BookingWhere = { tenantId: t };
+
+  if (from || to) {
+    where.startAt = {};
+    if (from) where.startAt.gte = new Date(from);
+    if (to) where.startAt.lte = new Date(to);
+  }
+  if (staffId) where.staffId = staffId;
+  if (status) where.status = status;
+
+  const skip = (page - 1) * limit;
+
+  const [bookings, total] = await Promise.all([
+    db.booking.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        service: { select: { name: true, durationMin: true } },
+        staff: { select: { name: true } }
+      },
+      orderBy: { startAt: 'asc' }
+    }),
+    db.booking.count({ where })
+  ]);
+
+  res.json({
+    bookings,
+    pagination: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit)
+    }
+  });
+}));
+
+/**
+ * Admin: Create booking
+ */
+router.post('/api/admin/bookings', requireRole(['owner', 'admin']), asyncHandler(async (req, res) => {
+  const { serviceId, staffId, customerEmail, start } = validateBody(
+    bookingSchema.extend({
+      customerEmail: emailSchema // Admin can book for any email
+    }),
+    req.body
+  );
+
+  const t = tenantId(req);
+  const tenantDb = createTenantDb(t);
+
+  const service = await tenantDb.findService(serviceId); // Admin can book inactive services
+  const staff = await tenantDb.findStaff(staffId); // Admin can book with inactive staff
+
+  const startDate = new Date(start);
+  const endDate = new Date(startDate.getTime() + service.durationMin * 60000);
+
+  // Check for conflicts
+  const hasConflict = await tenantDb.hasBookingConflict(staffId, startDate, endDate);
+  if (hasConflict) {
+    throw new ConflictError('Time slot is already booked');
+  }
+
+  const booking = await db.booking.create({
+    data: {
+      tenantId: t,
+      serviceId,
+      staffId,
+      customerEmail,
+      startAt: startDate,
+      endAt: endDate,
+      status: 'CONFIRMED',
+      createdBy: req.user?.email ?? null
+    }
+  });
+
+  logger.info('Booking created by admin', {
+    bookingId: booking.id,
+    customerEmail,
+    serviceId,
+    staffId,
+    createdBy: req.user?.email
+  });
+
+  res.status(201).json(booking);
+}));
+
+/**
+ * Admin: Cancel/Delete booking
+ */
+router.delete('/api/admin/bookings/:id', requireRole(['owner', 'admin']), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const t = tenantId(req);
+  const tenantDb = createTenantDb(t);
+
+  const booking = await tenantDb.findBooking(id);
+
+  await db.booking.update({
+    where: { id },
+    data: {
+      status: 'CANCELLED',
+      cancelledBy: req.user?.email ?? 'admin'
+    }
+  });
+
+  logger.info('Booking cancelled by admin', {
+    bookingId: id,
+    cancelledBy: req.user?.email,
+    customerEmail: booking.customerEmail
+  });
+
+  // TODO: Notify waiting list customers
+
+  res.status(204).send();
+}));
+
+export default router;

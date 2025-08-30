@@ -1,68 +1,161 @@
-import { Router } from 'express'
-import { db } from '../lib/db'
-import { tenantId, requireRole } from '../lib/guards'
-const r = Router()
+import { Router } from 'express';
+import { z } from 'zod';
+import { db } from '../lib/db.js';
+import { tenantId, requireRole } from '../lib/guards.js';
+import { logger } from '../lib/logger.js';
+import { asyncHandler } from '../lib/middleware.js';
+import { createTenantDb } from '../lib/db-helpers.js';
+import { serviceSchema, validateBody } from '../lib/validation.js';
+import { 
+  ValidationError, 
+  ConflictError, 
+  NotFoundError 
+} from '../lib/errors.js';
 
-// Public: aktive Services
-r.get('/api/services', async (req, res) => {
-  const list = await db.service.findMany({
-    where: { tenantId: tenantId(req), active: true },
+const router = Router();
+
+/**
+ * Public: Get active services
+ */
+router.get('/api/services', asyncHandler(async (req, res) => {
+  const services = await db.service.findMany({
+    where: { 
+      tenantId: tenantId(req), 
+      active: true 
+    },
     orderBy: { name: 'asc' }
-  })
-  res.json(list)
-})
+  });
 
-// Admin: Liste
-r.get('/api/admin/services', requireRole(['owner','admin']), async (req, res) => {
-  const list = await db.service.findMany({
+  res.json(services);
+}));
+
+/**
+ * Admin: List all services
+ */
+router.get('/api/admin/services', requireRole(['owner', 'admin']), asyncHandler(async (req, res) => {
+  const services = await db.service.findMany({
     where: { tenantId: tenantId(req) },
     orderBy: { name: 'asc' }
-  })
-  res.json(list)
-})
+  });
 
-// Admin: Create
-r.post('/api/admin/services', requireRole(['owner','admin']), async (req, res) => {
-  const { name, durationMin, priceCents, category, active } = req.body || {}
-  if (!name || durationMin==null || priceCents==null) return res.status(422).json({ error:'Validation' })
-  if (+durationMin < 10 || +priceCents < 0) return res.status(422).json({ error:'Validation' })
-  const t = tenantId(req)
-  const dup = await db.service.findFirst({ where: { tenantId: t, name } })
-  if (dup) return res.status(409).json({ error:'Duplicate name' })
-  const created = await db.service.create({
-    data: { tenantId: t, name, durationMin:+durationMin, priceCents:+priceCents, category: category ?? null, active: active ?? true }
-  })
-  res.status(201).json(created)
-})
+  res.json(services);
+}));
 
-// Admin: Update
-r.put('/api/admin/services/:id', requireRole(['owner','admin']), async (req, res) => {
-  const { id } = req.params
-  const svc = await db.service.findUnique({ where: { id }})
-  if (!svc || svc.tenantId !== tenantId(req)) return res.status(404).json({ error:'Not found' })
-  const { name, durationMin, priceCents, category, active } = req.body || {}
-  if (!name || durationMin==null || priceCents==null) return res.status(422).json({ error:'Validation' })
-  if (+durationMin < 10 || +priceCents < 0) return res.status(422).json({ error:'Validation' })
-  if (name !== svc.name) {
-    const dup = await db.service.findFirst({ where: { tenantId: svc.tenantId, name } })
-    if (dup) return res.status(409).json({ error:'Duplicate name' })
+/**
+ * Admin: Create service
+ */
+router.post('/api/admin/services', requireRole(['owner', 'admin']), asyncHandler(async (req, res) => {
+  const { name, durationMin, priceCents, category, active } = validateBody(serviceSchema, req.body);
+  const t = tenantId(req);
+
+  // Check for duplicate name
+  const existingService = await db.service.findFirst({
+    where: { tenantId: t, name }
+  });
+
+  if (existingService) {
+    throw new ConflictError('Service with this name already exists');
   }
-  const updated = await db.service.update({
+
+  const service = await db.service.create({
+    data: {
+      tenantId: t,
+      name,
+      durationMin,
+      priceCents,
+      category: category || null,
+      active: active ?? true
+    }
+  });
+
+  logger.info('Service created', {
+    serviceId: service.id,
+    name: service.name,
+    createdBy: req.user?.email
+  });
+
+  res.status(201).json(service);
+}));
+
+/**
+ * Admin: Update service
+ */
+router.put('/api/admin/services/:id', requireRole(['owner', 'admin']), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { name, durationMin, priceCents, category, active } = validateBody(
+    serviceSchema.partial(),
+    req.body
+  );
+  
+  const t = tenantId(req);
+  const tenantDb = createTenantDb(t);
+
+  // Find existing service
+  const existingService = await tenantDb.findService(id);
+
+  // Check for duplicate name (if name is being changed)
+  if (name && name !== existingService.name) {
+    const duplicateService = await db.service.findFirst({
+      where: { tenantId: t, name }
+    });
+
+    if (duplicateService) {
+      throw new ConflictError('Service with this name already exists');
+    }
+  }
+
+  const updatedService = await db.service.update({
     where: { id },
-    data: { name, durationMin:+durationMin, priceCents:+priceCents, category: category ?? svc.category, active: typeof active==='boolean'?active:svc.active }
-  })
-  res.json(updated)
-})
+    data: {
+      ...(name && { name }),
+      ...(durationMin && { durationMin }),
+      ...(priceCents !== undefined && { priceCents }),
+      ...(category !== undefined && { category }),
+      ...(active !== undefined && { active })
+    }
+  });
 
-// Admin: Delete (blockieren falls in Benutzung)
-r.delete('/api/admin/services/:id', requireRole(['owner','admin']), async (req, res) => {
-  const { id } = req.params
-  const svc = await db.service.findUnique({ where: { id }})
-  if (!svc || svc.tenantId !== tenantId(req)) return res.status(404).json({ error:'Not found' })
-  const used = await db.booking.findFirst({ where: { serviceId: id, status:'CONFIRMED' } })
-  if (used) return res.status(400).json({ error:'Service in use' })
-  await db.service.delete({ where: { id }})
-  res.status(204).send()
-})
+  logger.info('Service updated', {
+    serviceId: id,
+    updatedBy: req.user?.email,
+    changes: Object.keys(req.body)
+  });
 
-export default r
+  res.json(updatedService);
+}));
+
+/**
+ * Admin: Delete service (only if not in use)
+ */
+router.delete('/api/admin/services/:id', requireRole(['owner', 'admin']), asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const t = tenantId(req);
+  const tenantDb = createTenantDb(t);
+
+  // Find service
+  const service = await tenantDb.findService(id);
+
+  // Check if service is in use
+  const activeBooking = await db.booking.findFirst({
+    where: { 
+      serviceId: id, 
+      status: 'CONFIRMED' 
+    }
+  });
+
+  if (activeBooking) {
+    throw new ValidationError('Cannot delete service that has active bookings');
+  }
+
+  await db.service.delete({ where: { id } });
+
+  logger.info('Service deleted', {
+    serviceId: id,
+    serviceName: service.name,
+    deletedBy: req.user?.email
+  });
+
+  res.status(204).send();
+}));
+
+export default router;

@@ -115,7 +115,7 @@ describe('Bookings Cancel API', () => {
       .set(customerHeaders)
 
     expect(response.status).toBe(400)
-    expect(response.body.error).toMatch(/Too late/)
+    expect(response.body.error).toContain('Cannot cancel booking less than 24 hours')
     
     // Status sollte CONFIRMED bleiben
     const unchanged = await db.booking.findUnique({ where: { id: bookingNear } })
@@ -155,6 +155,6 @@ describe('Bookings Cancel API', () => {
       .set(customerHeaders) // customer@dev.local versucht andere zu löschen
 
     expect(response.status).toBe(403)
-    expect(response.body.error).toBe('Forbidden')
+    expect(response.body.error).toBe('Not your booking')
   })
 })

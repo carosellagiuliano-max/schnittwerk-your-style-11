@@ -122,7 +122,7 @@ describe('Bookings Public API', () => {
       })
 
     expect(overlap.status).toBe(409)
-    expect(overlap.body.error).toBe('Overlap')
+    expect(overlap.body.error).toBe('Time slot is already booked')
   })
 
   it('blocks banned customers', async () => {
@@ -147,7 +147,7 @@ describe('Bookings Public API', () => {
       })
 
     expect(banned.status).toBe(403)
-    expect(banned.body.error).toBe('Banned')
+    expect(banned.body.error).toBe('Customer is banned')
   })
 
   it('returns customer bookings via /api/bookings/me', async () => {

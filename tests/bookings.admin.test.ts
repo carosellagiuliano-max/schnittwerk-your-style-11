@@ -102,7 +102,9 @@ describe('Bookings Admin API', () => {
       .set(adminHeaders)
 
     expect(listAll.status).toBe(200)
-    expect(Array.isArray(listAll.body)).toBe(true)
+    expect(listAll.body).toHaveProperty('bookings')
+    expect(listAll.body).toHaveProperty('pagination')
+    expect(Array.isArray(listAll.body.bookings)).toBe(true)
 
     // Mit staffId Filter
     const listFiltered = await request(app)
@@ -110,7 +112,7 @@ describe('Bookings Admin API', () => {
       .set(adminHeaders)
 
     expect(listFiltered.status).toBe(200)
-    expect(listFiltered.body.every((b: any) => b.staffId === staffId)).toBe(true)
+    expect(listFiltered.body.bookings.every((b: { staffId: string }) => b.staffId === staffId)).toBe(true)
 
     // Mit Status Filter
     const listConfirmed = await request(app)
@@ -118,7 +120,7 @@ describe('Bookings Admin API', () => {
       .set(adminHeaders)
 
     expect(listConfirmed.status).toBe(200)
-    expect(listConfirmed.body.every((b: any) => b.status === 'CONFIRMED')).toBe(true)
+    expect(listConfirmed.body.bookings.every((b: { status: string }) => b.status === 'CONFIRMED')).toBe(true)
   })
 
   it('admin can delete any booking', async () => {

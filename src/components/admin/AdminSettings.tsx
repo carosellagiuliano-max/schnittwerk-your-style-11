@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { api } from '@/lib/api';
+import { logger } from '@/lib/logger';
 import { 
   Settings, 
   User, 
@@ -77,21 +78,21 @@ export function AdminSettings() {
 
   // Services von der API laden
   useEffect(() => {
-    api('/api/admin/services').then(setServices).catch(console.error)
+    api('/api/admin/services').then(setServices).catch((error) => logger.error('Failed to load services:', error))
   }, [])
 
   const handleSaveAdminData = () => {
-    console.log('Saving admin data:', adminData);
+    logger.info('Saving admin data:', adminData);
     // Here you would save to database
   };
 
   const handleSaveBusinessSettings = () => {
-    console.log('Saving business settings:', businessSettings);
+    logger.info('Saving business settings:', businessSettings);
     // Here you would save to database
   };
 
   const handleSaveHours = () => {
-    console.log('Saving hours:', hours);
+    logger.info('Saving hours:', hours);
     // Here you would save to database
   };
 
@@ -110,7 +111,7 @@ export function AdminSettings() {
         setServices((prev) => [...prev, created])
         setNewService({ name: '', price: '', duration: '', category: 'Standard' });
       } catch (error) {
-        console.error('Fehler beim Erstellen des Services:', error)
+        logger.error('Fehler beim Erstellen des Services:', error as Error)
       }
     }
   };
@@ -120,7 +121,7 @@ export function AdminSettings() {
       await api(`/api/admin/services/${id}`, { method: 'DELETE' })
       setServices((prev) => prev.filter(s => s.id !== id))
     } catch (error) {
-      console.error('Fehler beim Löschen des Services:', error)
+      logger.error('Fehler beim Löschen des Services:', error as Error)
     }
   };
 
@@ -141,7 +142,7 @@ export function AdminSettings() {
       })
       setServices((prev) => prev.map(s => s.id === id ? updated : s))
     } catch (error) {
-      console.error('Fehler beim Aktualisieren des Services:', error)
+      logger.error('Fehler beim Aktualisieren des Services:', error as Error)
     }
   };
 

@@ -1,5 +1,7 @@
 import express from 'express';
 import { db } from '../lib/db.js';
+import { logger } from '../lib/logger.js';
+import { asyncHandler } from '../lib/middleware.js';
 import { z } from 'zod';
 import { addDays, addWeeks, addMonths, format, startOfDay } from 'date-fns';
 
@@ -152,7 +154,7 @@ router.post('/recurring', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Recurring booking creation error:', error);
+    logger.error('Recurring booking creation failed', error as Error);
     res.status(400).json({ 
       error: error instanceof Error ? error.message : 'Recurring booking creation failed' 
     });
@@ -204,7 +206,7 @@ router.get('/recurring', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Recurring bookings retrieval error:', error);
+    logger.error('Recurring bookings retrieval failed', error as Error);
     res.status(500).json({ error: 'Failed to retrieve recurring bookings' });
   }
 });
@@ -234,7 +236,7 @@ router.patch('/recurring/:id/status', async (req, res) => {
     res.json({ message: 'Status updated successfully' });
 
   } catch (error) {
-    console.error('Recurring booking status update error:', error);
+    logger.error('Recurring booking status update failed', error as Error);
     res.status(500).json({ error: 'Failed to update status' });
   }
 });
@@ -301,7 +303,7 @@ router.post('/group', async (req, res) => {
     res.json(groupBooking);
 
   } catch (error) {
-    console.error('Group booking creation error:', error);
+    logger.error('Group booking creation failed', error as Error);
     res.status(400).json({ 
       error: error instanceof Error ? error.message : 'Group booking creation failed' 
     });
@@ -350,7 +352,7 @@ router.get('/group', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Group bookings retrieval error:', error);
+    logger.error('Group bookings retrieval failed', error as Error);
     res.status(500).json({ error: 'Failed to retrieve group bookings' });
   }
 });
@@ -402,7 +404,7 @@ router.post('/earlier-appointment', async (req, res) => {
     res.json(request);
 
   } catch (error) {
-    console.error('Earlier appointment request error:', error);
+    logger.error('Earlier appointment request failed', error as Error);
     res.status(400).json({ 
       error: error instanceof Error ? error.message : 'Earlier appointment request failed' 
     });
@@ -446,7 +448,7 @@ router.get('/earlier-appointment', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Earlier appointment requests retrieval error:', error);
+    logger.error('Earlier appointment requests retrieval failed', error as Error);
     res.status(500).json({ error: 'Failed to retrieve requests' });
   }
 });

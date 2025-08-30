@@ -1,5 +1,7 @@
 import express from 'express';
 import { db } from '../lib/db.js';
+import { logger } from '../lib/logger.js';
+import { asyncHandler } from '../lib/middleware.js';
 import { z } from 'zod';
 import nodemailer from 'nodemailer';
 import twilio from 'twilio';
@@ -139,7 +141,7 @@ async function sendNotification(
     return { success: status === 'sent', logId: log.id, error: errorMsg };
 
   } catch (error) {
-    console.error('Notification send error:', error);
+    logger.error('Notification send failed', error as Error);
     
     // Log failed notification
     await db.notificationLog.create({
@@ -178,7 +180,7 @@ router.post('/templates', async (req, res) => {
     res.json(template);
 
   } catch (error) {
-    console.error('Template creation error:', error);
+    logger.error('Template creation failed', error as Error);
     res.status(400).json({ 
       error: error instanceof Error ? error.message : 'Template creation failed' 
     });
@@ -205,7 +207,7 @@ router.get('/templates', async (req, res) => {
     res.json(templates);
 
   } catch (error) {
-    console.error('Templates retrieval error:', error);
+    logger.error('Templates retrieval failed', error as Error);
     res.status(500).json({ error: 'Failed to retrieve templates' });
   }
 });
@@ -231,7 +233,7 @@ router.put('/templates/:id', async (req, res) => {
     res.json({ message: 'Template updated successfully' });
 
   } catch (error) {
-    console.error('Template update error:', error);
+    logger.error('Template update failed', error as Error);
     res.status(400).json({ 
       error: error instanceof Error ? error.message : 'Template update failed' 
     });
@@ -266,7 +268,7 @@ router.post('/send', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Send notification error:', error);
+    logger.error('Send notification failed', error as Error);
     res.status(400).json({ 
       error: error instanceof Error ? error.message : 'Send failed' 
     });
@@ -311,7 +313,7 @@ router.get('/logs', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Logs retrieval error:', error);
+    logger.error('Logs retrieval failed', error as Error);
     res.status(500).json({ error: 'Failed to retrieve logs' });
   }
 });
