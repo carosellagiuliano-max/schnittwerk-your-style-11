@@ -1,11 +1,11 @@
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Users, TrendingUp, Scissors, Settings, UserX, UserCheck } from 'lucide-react';
+import { Calendar, Users, TrendingUp, Scissors, Settings, UserX, UserCheck, Bell, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AdminSidebarProps {
-  activeView: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff';
-  onViewChange: (view: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff') => void;
+  activeView: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff' | 'notifications' | 'media';
+  onViewChange: (view: 'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff' | 'notifications' | 'media') => void;
 }
 
 export function AdminSidebar({ activeView, onViewChange }: AdminSidebarProps) {
@@ -27,6 +27,18 @@ export function AdminSidebar({ activeView, onViewChange }: AdminSidebarProps) {
       label: 'Mitarbeiter',
       icon: UserCheck,
       description: 'Personal & Arbeitszeiten'
+    },
+    {
+      id: 'notifications' as const,
+      label: 'Benachrichtigungen',
+      icon: Bell,
+      description: 'E-Mail & SMS Center'
+    },
+    {
+      id: 'media' as const,
+      label: 'Medien',
+      icon: Image,
+      description: 'Bilder & Galerie'
     },
     {
       id: 'finances' as const,

@@ -119,4 +119,25 @@ r.delete('/api/admin/bookings/:id', requireRole(['owner','admin']), async (req,r
   res.status(204).send()
 })
 
+// Customer: cancel own booking (>24h only)
+r.delete('/api/bookings/:id', async (req,res)=>{
+  const { id } = req.params
+  if (!req.user || req.user.role !== 'customer') return res.status(401).json({ error:'Not logged in' })
+  const t = tenantId(req)
+  const b = await db.booking.findUnique({ where:{ id } })
+  if (!b || b.tenantId !== t) return res.status(404).json({ error:'Not found' })
+  if (b.customerEmail !== req.user.email) return res.status(403).json({ error:'Not your booking' })
+  if (b.status !== 'CONFIRMED') return res.status(400).json({ error:'Already cancelled' })
+  
+  // 24h rule
+  const now = new Date()
+  const hoursUntilStart = (b.startAt.getTime() - now.getTime()) / (1000 * 60 * 60)
+  if (hoursUntilStart < 24 && req.user.role === 'customer') {
+    return res.status(400).json({ error:'Too late to cancel (less than 24h)' })
+  }
+  
+  await db.booking.update({ where:{ id }, data:{ status:'CANCELLED', cancelledBy: req.user.email } })
+  res.status(204).send()
+})
+
 export default r

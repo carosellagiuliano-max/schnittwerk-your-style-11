@@ -1,7 +1,7 @@
 import request from 'supertest'
 import app from '../src/server/app'
 import { PrismaClient } from '@prisma/client'
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 
 const db = new PrismaClient()
 
@@ -34,6 +34,15 @@ describe('Bookings Public API', () => {
     })
     staffId = staff.id
 
+    // Create service-staff link
+    await db.staffService.create({
+      data: {
+        tenantId: 't_dev',
+        serviceId,
+        staffId
+      }
+    })
+
     // Schedule: 09:00-12:00 (540-720 Minuten)
     await db.schedule.create({
       data: {
@@ -52,7 +61,20 @@ describe('Bookings Public API', () => {
     futureStart = tomorrow.toISOString()
   })
 
+  beforeEach(async () => {
+    // Clean up bookings before each test
+    await db.booking.deleteMany({
+      where: { tenantId: 't_dev' }
+    })
+  })
+
   afterAll(async () => {
+    // Clean up test data
+    await db.booking.deleteMany({ where: { tenantId: 't_dev' } })
+    await db.schedule.deleteMany({ where: { tenantId: 't_dev' } })
+    await db.staffService.deleteMany({ where: { tenantId: 't_dev' } })
+    await db.staff.deleteMany({ where: { tenantId: 't_dev' } })
+    await db.service.deleteMany({ where: { tenantId: 't_dev' } })
     await db.$disconnect()
   })
 

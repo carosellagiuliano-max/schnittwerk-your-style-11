@@ -6,6 +6,8 @@ import { FinancialOverview } from './FinancialOverview';
 import { InactiveCustomers } from './InactiveCustomers';
 import { AdminSettings } from './AdminSettings';
 import { AdminStaff } from './AdminStaff';
+import { NotificationCenter } from './notification-center';
+import { MediaUpload } from './media-upload';
 import { Button } from '@/components/ui/button';
 import { LogOut } from 'lucide-react';
 
@@ -14,7 +16,7 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
-  const [activeView, setActiveView] = useState<'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff'>('calendar');
+  const [activeView, setActiveView] = useState<'calendar' | 'customers' | 'finances' | 'inactive' | 'settings' | 'staff' | 'notifications' | 'media'>('calendar');
 
   return (
     <div className="flex h-screen bg-background">
@@ -27,6 +29,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             {activeView === 'calendar' && 'Terminkalender'}
             {activeView === 'customers' && 'Kundenverwaltung'}
             {activeView === 'staff' && 'Mitarbeiter'}
+            {activeView === 'notifications' && 'Benachrichtigungen'}
+            {activeView === 'media' && 'Medien-Verwaltung'}
             {activeView === 'finances' && 'Finanzübersicht'}
             {activeView === 'inactive' && 'Inaktive Kunden'}
             {activeView === 'settings' && 'Einstellungen'}
@@ -42,6 +46,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
           {activeView === 'calendar' && <CalendarView />}
           {activeView === 'customers' && <CustomerManagement />}
           {activeView === 'staff' && <AdminStaff />}
+          {activeView === 'notifications' && <NotificationCenter />}
+          {activeView === 'media' && <MediaUpload category="gallery" className="max-w-4xl" />}
           {activeView === 'finances' && <FinancialOverview />}
           {activeView === 'inactive' && <InactiveCustomers />}
           {activeView === 'settings' && <AdminSettings />}
